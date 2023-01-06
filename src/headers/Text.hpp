@@ -1,6 +1,6 @@
 #pragma once
 
-#define initialDefaultTextColor sf::Color::White
+#define initialDefaultTextColor sf::Color(255, 255, 255, 191)
 #define initialDefaultTextScale sf::Vector2f(1, 1)
 
 const int fontSize = 10;

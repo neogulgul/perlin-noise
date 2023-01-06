@@ -58,6 +58,28 @@ std::string boolToString(bool boolean)
 	return "False";
 }
 
+std::string removeFromString(std::string string, int start, int range)
+{
+	std::string returnString;
+
+	if (start < 0 || range < 0 || start + range > string.size()) { return "Error!"; } // invalid start and/or range
+
+	for (int i = 0; i < string.size(); i++)
+	{
+		if (i >= start && i < start + range) { continue; }
+
+		returnString += string[i];
+	}
+
+	return returnString;
+}
+
+std::string replaceStringSubstring(std::string string, std::string substring, std::string replacement)
+{
+	string.replace(string.find(substring), substring.size(), replacement);
+	return string;
+}
+
 sf::Vector2f align(sf::Vector2f size, Alignment horizontalAlignment, Alignment verticalAlignment, sf::Vector2f position)
 {
 	switch (horizontalAlignment)
@@ -91,4 +113,29 @@ sf::Vector2f align(sf::Vector2f size, Alignment horizontalAlignment, Alignment v
 	}
 
 	return position;
+}
+
+void createFile(std::string path)
+{
+	if (fs::is_directory(path))
+	{
+		fs::remove_all(path);
+	}
+	if (!fs::is_regular_file(path))
+	{
+		std::ofstream file(path);
+		file.close();
+	}
+}
+
+void createFolder(std::string path)
+{
+	if (fs::is_regular_file(path))
+	{
+		fs::remove(path);
+	}
+	if (!fs::is_directory(path))
+	{
+		fs::create_directory(path);
+	}
 }

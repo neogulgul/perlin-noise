@@ -1,11 +1,7 @@
 #pragma once
 
-#include <cmath>
-#include <random>
-
 #include "helper.hpp"
 #include "Text.hpp"
-#include "window.hpp"
 
 struct Root
 {
@@ -13,27 +9,36 @@ struct Root
 	sf::View view;
 	sf::Event event;
 
-	sf::VertexArray pixel;
+	sf::Vector2f viewSize;
 
+	bool takeScreenshot = false;
+
+	unsigned int targetFPS, FPS, averageFPS;
+	std::vector<unsigned int> pastFPS;
+	unsigned int maxCountPastFPS = 100;
 	float     updateFPSDelta = 0.1; // the time between FPS counter update, in seconds
 	sf::Clock updateFPSClock;       // used to only update the FPS counter after a certain amount of time has passed, to make it more readable
 	sf::Clock   calcFPSClock;       // used to calculate FPS
 	sf::Clock   displayClock;       // the time it takes the window to display everything drawn which is then subtracted when calculating FPS
-	int FPS;
 
 	sf::Vector2f mousePosition;
+
+	sf::VertexArray pixel;
 
 	std::mt19937 rng;
 	int_dist coinFlip;
 
 	Text text;
 
-	Root()
+	Root(unsigned int targetFPS, sf::Vector2f viewSize, sf::Vector2u windowSize, std::string windowTitle)
 	{
-		window.create({windowWidth, windowHeight}, windowTitle, sf::Style::Default);
+		this->targetFPS = targetFPS;
+		this->viewSize = viewSize;
+
+		window.create({windowSize.x, windowSize.y}, windowTitle, sf::Style::Default);
 		window.setFramerateLimit(targetFPS);
-		view.setCenter(viewWidth / 2, viewHeight / 2);
-		view.setSize(viewWidth, viewHeight);
+		view.setCenter(viewSize.x / 2, viewSize.y / 2);
+		view.setSize(viewSize);
 
 		pixel.setPrimitiveType(sf::Quads);
 		pixel.resize(4);
@@ -52,6 +57,8 @@ struct Root
 
 			window.clear();
 
+			calcFPS();
+
 			update();
 
 			window.setView(view);
@@ -61,6 +68,8 @@ struct Root
 			displayClock.restart();
 
 			window.display();
+
+			if (takeScreenshot) { screenshot(); }
 		}
 	}
 
@@ -77,29 +86,58 @@ struct Root
 		}
 	}
 
+	void screenshot()
+	{
+		sf::Texture screenshotTexture;
+		screenshotTexture.create(window.getSize().x, window.getSize().y);
+		screenshotTexture.update(window);
+		if (!fs::is_directory("screenshots"))
+		{
+			createFolder("screenshots");
+		}
+
+		std::chrono::time_point currentTime = std::chrono::system_clock::now();
+
+		// removing "ns" from end of currentTime
+		std::stringstream ss;
+		ss << currentTime.time_since_epoch();
+		ss.str(replaceStringSubstring(ss.str(), "ns"));
+
+		screenshotTexture.copyToImage().saveToFile("screenshots/" + ss.str() + ".png");
+		takeScreenshot = false;
+	}
+
 	void updateMousePosition()
 	{
 		mousePosition = window.mapPixelToCoords(sf::Mouse::getPosition(window));
 	}
 
-	void updateFPS()
+	void calcFPS()
 	{
 		if (updateFPSClock.getElapsedTime().asSeconds() >= updateFPSDelta)
 		{
 			updateFPSClock.restart();
 			FPS = std::floor(1.f / (calcFPSClock.getElapsedTime().asSeconds() - displayClock.getElapsedTime().asSeconds()));
+
+			// average FPS
+			pastFPS.push_back(FPS);
+			if (pastFPS.size() > maxCountPastFPS)
+			{
+				pastFPS.erase(pastFPS.begin());
+			}
+			averageFPS = 0;
+			for (int i = 0; i < pastFPS.size(); i++)
+			{
+				averageFPS += pastFPS[i];
+			}
+			averageFPS /= pastFPS.size();
 		}
 		calcFPSClock.restart();
 	}
 
-	void drawFPS(sf::Vector2f position, sf::Color color, sf::Vector2f scale)
-	{
-		text.draw("FPS:" + std::to_string(FPS), Start, Start, position, color, scale);
-	}
-
 	void drawPixel(int x, int y, sf::Color color) // this function is terribly inefficient on a large scale, but it works
 	{
-		if (x < 0 || x >= viewWidth || y < 0 || y >= viewHeight) { return; } // out of view bounds
+		if (x < 0 || x >= viewSize.x || y < 0 || y >= viewSize.y) { return; } // out of view bounds
 
 		pixel[0].position = { (float)x    , (float)y + 1 };
 		pixel[1].position = { (float)x    , (float)y     };
